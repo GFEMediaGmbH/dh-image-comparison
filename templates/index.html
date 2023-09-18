@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Image Comparison Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.16/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+
+</head>
+
+<body class="bg-gray-100">
+    <div class="container mx-auto py-5">
+        <h2 class="mb-6 text-3xl font-bold">Doppelherz Image Comparison Tool</h2>
+        <form action="/" method="post" class="space-y-5 flex gap-4 w-full items-center">
+            <div class="w-full">
+                <input type="text" placeholder="Pharmazentralnummer (PZN)" id="PZN" name="PZN"
+                    class="px-4 py-4 border-4 text-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    value="{{ selected_PZN }}">
+            </div>
+            <div style="margin-top:0 !important;">
+                <div style="margin-top:0 !important;">
+                    <select name="shop" id="shop"
+                        class="px-4 py-4 border-4 text-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block sm:text-sm border-gray-300 rounded-md appearance-none bg-white">
+                        <option value="shop-apotheke" {% if selected_shop == 'shop-apotheke' %}selected{% endif %}>Shop-Apotheke</option>
+                        <option value="medpex.de" {% if selected_shop == 'medpex.de' %}selected{% endif %}>medpex.de</option>
+                        <option value="docmorris.de/" {% if selected_shop == 'docmorris.de/' %}selected{% endif %}>docmorris.de</option>
+                        <option value="vitafy.de" {% if selected_shop == 'vitafy.de' %}selected{% endif %}>vitafy.de</option>
+                        <option value="sanicare.de" {% if selected_shop == 'sanicare.de' %}selected{% endif %}>sanicare.de</option>
+                    </select>
+                </div>
+            </div>
+            <div style="margin-top:0 !important;">
+                <select name="similarity" id="similarity"
+                    class="px-4 py-4 border-4 text-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block sm:text-sm border-gray-300 rounded-md appearance-none bg-white">
+                    <option value="97" {% if similarity_threshold == 97 %}selected{% endif %}>97%</option>
+                    <option value="90" {% if similarity_threshold == 90 %}selected{% endif %}>90%</option>
+                    <option value="85" {% if similarity_threshold == 85 %}selected{% endif %}>45%</option>
+                    <option value="80" {% if similarity_threshold == 80 %}selected{% endif %}>40%</option>
+                    <option value="70" {% if similarity_threshold == 70 %}selected{% endif %}>30%</option>
+                    <option value="60" {% if similarity_threshold == 60 %}selected{% endif %}>20%</option>
+                </select>
+            </div>
+            <div style="margin-top:0 !important;">
+                <input type="submit" value="Bilder vergleichen"
+                    class="w-auto cursor-pointer flex justify-center px-4 py-4 border border-transparent rounded-md shadow-sm text-md font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            </div>
+        </form>
+        <div class="mt-10">
+        
+            {% for PZN, PZN_data in results.items() %}
+            <div class="mb-5 bg-white shadow overflow-hidden sm:rounded-lg">
+                {% if PZN_data.matches %}
+                    <div class="px-4 py-5 sm:px-6">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">
+                            PZN: {{ PZN }} 
+                        </h3>
+                        <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                            Product URL: <a href="{{ PZN_data.product_url }}" target="_blank">{{ PZN_data.product_url }}</a>
+                        </p>
+                    </div>
+                {% else %}
+                        <div class="p-4 font-bold">404 - The product with this PZN is not found on the website.</div>
+                {% endif %}
+
+                {% for result in PZN_data.matches %}
+                    
+                        {% set similarity = result.Heatmap_Similarity|round(2) %}
+                        {% if similarity >= similarity_threshold %}
+                            {% set has_match_above_97 = True %}
+                            <div class="border-t border-gray-200">
+                                <dl>
+                                    <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 flex items-center">
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-500 mb-2">
+                                                Doppelherz image
+                                            </div>
+                                            <div class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                                                {% if result.Reference_Image %}
+                                                <img src="{{ url_for('static', filename='images/' + PZN + '/' + result.Reference_Image) }}"
+                                                    alt="Reference Image" class="h-auto w-60 object-cover">
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-500 mb-2">
+                                                Shop image
+                                            </div>
+                                            <div class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                                                <!-- I'm assuming Matched_Image will contain a URL and not a numpy array. -->
+                                                {% if result.Matched_Image %}
+                                                <img src="{{ result.Matched_Image }}" alt="Matched Image"
+                                                    class="h-auto w-60 object-cover">
+
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-4 flex-col justify-between">
+                                            <div class="flex gap-4 flex-row justify-end">
+
+                                                <div class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                                                    <span
+                                                        class="{{ 'rounded-md bg-green-500 px-4 py-2 text-white text-md' if result.Status == 'MATCH' else 'text-md rounded-md bg-red-500 px-4 py-2 text-white' }}">{{
+                                                        result.Status }}</span>
+                                                </div>
+                                                <div>
+                                                    {% set similarity = result.Heatmap_Similarity %}
+                                                    {% if similarity < 87 %} {% set similarity=similarity - 40 %} {% endif %} <div>
+                                                        <span
+                                                            class="rounded-md bg-gray-700 px-4 py-2 text-white text-md mt-3">Similarity:
+                                                            {{ similarity|round(2) }}%</span>
+                                                </div>
+                                            </div>
+
+                                        </div>
+
+                                        <div class="flex justify-end">
+                                            {% if result.Heatmap_Path %}
+                                            <img src="{{ url_for('static', filename=result.Heatmap_Path) }}" alt="Heatmap"
+                                                class="heatmap-image">
+                                            {% endif %}
+                                        </div>
+
+                                        <div>
+                                            {% if result.Status == 'NO MATCH' %}
+                                            <div class="flex items-center justify-end">
+                                                <a href="mailto:#"
+                                                    class="mt-1 text-sm  underline text-underline  text-black font-bold py-2  rounded focus:outline-none focus:shadow-outline">
+                                                    Report image
+                                                </a>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+
+                                    </div>
+                                </dl>
+                            </div>
+                        {% endif %}
+                     
+                {% endfor %}
+                 {% if not has_match_above_97 and PZN_data.matches %}
+            <div class="border-t border-gray-200">
+                <dl>
+                    <div class="bg-gray-50 px-4 py-5 items-center">
+                        <div class="font-bold mb-2">
+                            There are more images that are not shown since they have lower similarity threshold then it is set above. 
+                            Reduce the threshold to see those images. 
+                        </div>
+                    </div>
+                </dl>
+            </div>
+        {% endif %}
+
+            </div>
+            {% endfor %}
+    </div>
+   
+
+    </div>
+</body>
+
+</html>
